@@ -1,0 +1,8 @@
+config.py
+thumbnails/
+viewed.json
+viewed.json.tmp
+__pycache__/
+*.pyc
+.venv/
+venv/
