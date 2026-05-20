@@ -24,9 +24,15 @@ except ImportError as e:
 BASE_DIR = Path(__file__).resolve().parent
 THUMB_DIR = BASE_DIR / "thumbnails"
 VIEWED_FILE = BASE_DIR / "viewed.json"
-ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+PDF_EXTS = {".pdf"}
+ALLOWED_EXTS = IMAGE_EXTS | PDF_EXTS
 THUMB_SIZE = (300, 300)
 PORT = 8000
+
+
+def file_type(name: str) -> str:
+    return "pdf" if Path(name).suffix.lower() in PDF_EXTS else "image"
 
 THUMB_DIR.mkdir(exist_ok=True)
 
@@ -93,6 +99,14 @@ def ensure_thumb(name: str) -> Path:
     if tp.exists():
         return tp
     src = SCREENSHOT_DIR / name
+    if src.suffix.lower() in PDF_EXTS:
+        _make_pdf_thumb(src, tp)
+    else:
+        _make_image_thumb(src, tp)
+    return tp
+
+
+def _make_image_thumb(src: Path, dst: Path) -> None:
     with Image.open(src) as im:
         im.thumbnail(THUMB_SIZE)
         if im.mode != "RGB":
@@ -104,8 +118,21 @@ def ensure_thumb(name: str) -> Path:
                 im = bg
             else:
                 im = im.convert("RGB")
-        im.save(tp, "JPEG", quality=85)
-    return tp
+        im.save(dst, "JPEG", quality=85)
+
+
+def _make_pdf_thumb(src: Path, dst: Path) -> None:
+    import pypdfium2 as pdfium
+
+    pdf = pdfium.PdfDocument(str(src))
+    try:
+        pil = pdf[0].render(scale=1.0).to_pil()
+    finally:
+        pdf.close()
+    pil.thumbnail(THUMB_SIZE)
+    if pil.mode != "RGB":
+        pil = pil.convert("RGB")
+    pil.save(dst, "JPEG", quality=85)
 
 
 @asynccontextmanager
@@ -131,7 +158,12 @@ def list_images():
     items = []
     for name, meta in IMAGES.items():
         items.append(
-            {"name": name, "mtime": meta["mtime"], "viewed_at": VIEWED.get(name)}
+            {
+                "name": name,
+                "type": file_type(name),
+                "mtime": meta["mtime"],
+                "viewed_at": VIEWED.get(name),
+            }
         )
 
     def sort_key(item):
