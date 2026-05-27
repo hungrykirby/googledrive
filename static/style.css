@@ -59,7 +59,7 @@ header h1 {
   align-items: center;
   justify-content: center;
   z-index: 100;
-  padding: 16px;
+  padding: 0;
   cursor: zoom-out;
 }
 
