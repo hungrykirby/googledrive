@@ -39,24 +39,32 @@ function openItem(item, tile) {
     modalImg.hidden = false;
   }
   modal.classList.remove('hidden');
+  history.pushState({ modalOpen: true }, '');
   if (tile && tile.parentNode === grid && grid.firstChild !== tile) {
     grid.insertBefore(tile, grid.firstChild);
   }
   fetch(`/api/viewed/${encodeURIComponent(item.name)}`, { method: 'POST' }).catch(() => {});
 }
 
-function closeModal() {
+function closeModal({ fromPopState = false } = {}) {
+  if (modal.classList.contains('hidden')) return;
   modal.classList.add('hidden');
   modalImg.src = '';
   modalPdf.src = '';
+  if (!fromPopState && history.state && history.state.modalOpen) {
+    history.back();
+  }
 }
 
 modal.addEventListener('click', (e) => {
   if (e.target === modal) closeModal();
 });
-modalClose.addEventListener('click', closeModal);
+modalClose.addEventListener('click', () => closeModal());
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+});
+window.addEventListener('popstate', () => {
+  if (!modal.classList.contains('hidden')) closeModal({ fromPopState: true });
 });
 
 load();
