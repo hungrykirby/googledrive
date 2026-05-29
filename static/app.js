@@ -25,33 +25,38 @@ async function load() {
   grid.appendChild(frag);
 }
 
+const MODAL_HASH = '#image';
+const BLANK_PDF = 'about:blank';
+
 function openItem(item, tile) {
   const url = `/image/${encodeURIComponent(item.name)}`;
   if (item.type === 'pdf') {
     modalImg.hidden = true;
-    modalImg.src = '';
+    modalImg.removeAttribute('src');
     modalPdf.src = url;
     modalPdf.hidden = false;
   } else {
     modalPdf.hidden = true;
-    modalPdf.src = '';
+    modalPdf.src = BLANK_PDF;
     modalImg.src = url;
     modalImg.hidden = false;
   }
   modal.classList.remove('hidden');
-  history.pushState({ modalOpen: true }, '', '#image');
+  if (location.hash !== MODAL_HASH) {
+    location.hash = MODAL_HASH.slice(1);
+  }
   if (tile && tile.parentNode === grid && grid.firstChild !== tile) {
     grid.insertBefore(tile, grid.firstChild);
   }
   fetch(`/api/viewed/${encodeURIComponent(item.name)}`, { method: 'POST' }).catch(() => {});
 }
 
-function closeModal({ fromPopState = false } = {}) {
+function closeModal({ fromBack = false } = {}) {
   if (modal.classList.contains('hidden')) return;
   modal.classList.add('hidden');
-  modalImg.src = '';
-  modalPdf.src = '';
-  if (!fromPopState && history.state && history.state.modalOpen) {
+  modalImg.removeAttribute('src');
+  modalPdf.src = BLANK_PDF;
+  if (!fromBack && location.hash === MODAL_HASH) {
     history.back();
   }
 }
@@ -63,11 +68,13 @@ modalClose.addEventListener('click', () => closeModal());
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
 });
-window.addEventListener('popstate', () => {
-  if (!modal.classList.contains('hidden')) closeModal({ fromPopState: true });
+window.addEventListener('hashchange', () => {
+  if (location.hash !== MODAL_HASH && !modal.classList.contains('hidden')) {
+    closeModal({ fromBack: true });
+  }
 });
 
-if (location.hash === '#image') {
+if (location.hash === MODAL_HASH) {
   history.replaceState(null, '', location.pathname + location.search);
 }
 
