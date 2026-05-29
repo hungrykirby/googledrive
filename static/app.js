@@ -39,7 +39,7 @@ function openItem(item, tile) {
     modalImg.hidden = false;
   }
   modal.classList.remove('hidden');
-  history.pushState({ modalOpen: true }, '');
+  history.pushState({ modalOpen: true }, '', '#image');
   if (tile && tile.parentNode === grid && grid.firstChild !== tile) {
     grid.insertBefore(tile, grid.firstChild);
   }
@@ -66,5 +66,9 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('popstate', () => {
   if (!modal.classList.contains('hidden')) closeModal({ fromPopState: true });
 });
+
+if (location.hash === '#image') {
+  history.replaceState(null, '', location.pathname + location.search);
+}
 
 load();
