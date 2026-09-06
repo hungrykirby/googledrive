@@ -37,6 +37,7 @@ header h1 {
 }
 
 .tile {
+  position: relative;
   aspect-ratio: 1;
   background: #222;
   border-radius: 6px;
@@ -49,6 +50,74 @@ header h1 {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* 動画タイル中央の再生マーク */
+.play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.play::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 54%;
+  transform: translate(-50%, -50%);
+  border-left: 16px solid #fff;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+}
+
+/* GIF / PDF の種別ラベル */
+.tag {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+/* フォルダは上部のタブ形状と下部のキャプションで見分ける */
+.tile-folder::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 42%;
+  height: 10px;
+  background: #f0b429;
+  border-radius: 6px 6px 0 0;
+  z-index: 1;
+}
+
+.caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 8px 6px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .modal {
@@ -67,24 +136,59 @@ header h1 {
   display: none;
 }
 
-.modal img {
+.modal[data-mode="scroll"] {
+  cursor: default;
+}
+
+.modal img#modal-img,
+.modal video {
   width: 100%;
   height: 100%;
   object-fit: contain;
   cursor: default;
+  background: #000;
 }
 
-.modal iframe {
+/* PDF のページ / フォルダ内の画像を縦に並べて読む */
+#modal-scroll {
+  /* ページ番号の算出に offsetTop を使うので、この要素を offsetParent にする */
+  position: relative;
   width: 100%;
   height: 100%;
-  border: 0;
-  background: #fff;
-  cursor: default;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: #111;
+}
+
+#modal-scroll .page {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  margin: 0 auto 2px;
+  background: #1a1a1a;
+}
+
+#page-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 2;
 }
 
 #modal-close {
   position: absolute;
-  top: 12px;
+  top: calc(12px + env(safe-area-inset-top, 0px));
   right: 16px;
   width: 44px;
   height: 44px;
@@ -95,7 +199,7 @@ header h1 {
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
-  z-index: 1;
+  z-index: 3;
 }
 
 #modal-close:hover {

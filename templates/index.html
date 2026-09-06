@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Screenshots</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -15,7 +15,9 @@
   <div id="modal" class="modal hidden">
     <button id="modal-close" type="button" aria-label="閉じる">×</button>
     <img id="modal-img" alt="" hidden>
-    <iframe id="modal-pdf" hidden></iframe>
+    <video id="modal-video" controls playsinline preload="metadata" hidden></video>
+    <div id="modal-scroll" hidden></div>
+    <div id="page-indicator" hidden></div>
   </div>
   <script src="/static/app.js"></script>
 </body>
