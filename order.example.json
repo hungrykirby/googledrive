@@ -1,7 +1,7 @@
 {
-  "default": "desc",
+  "default": "oldest",
   "folders": {
-    "昇順で読みたいフォルダ名": "asc",
+    "ファイル名の順で読みたいフォルダ名": "name_asc",
     "順番を細かく決めたいフォルダ名": ["表紙.jpg", "1.png", "2.png"]
   }
 }

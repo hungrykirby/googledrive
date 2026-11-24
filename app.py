@@ -38,11 +38,16 @@ SEEN_FILE = BASE_DIR / "seen.json"
 # フォルダ内の並び順の設定(任意。無ければ全フォルダ DEFAULT_FOLDER_ORDER)
 ORDER_FILE = BASE_DIR / "order.json"
 
-# フォルダ内の並び順: ファイル名の自然順の昇順(1, 2, 10)/ 降順(10, 2, 1)
-ORDER_ASC = "asc"
-ORDER_DESC = "desc"
-ORDER_NAMES = (ORDER_ASC, ORDER_DESC)
-DEFAULT_FOLDER_ORDER = ORDER_DESC
+# フォルダ内の並び順
+#   oldest / newest: 更新日時の古い順 / 新しい順
+#     (ブラウザでダウンロードしたファイルなら、更新日時 = ダウンロードした日時)
+#   name_asc / name_desc: ファイル名の自然順(1, 2, 10)/ その逆順
+ORDER_OLDEST = "oldest"
+ORDER_NEWEST = "newest"
+ORDER_NAME_ASC = "name_asc"
+ORDER_NAME_DESC = "name_desc"
+ORDER_NAMES = (ORDER_OLDEST, ORDER_NEWEST, ORDER_NAME_ASC, ORDER_NAME_DESC)
+DEFAULT_FOLDER_ORDER = ORDER_OLDEST
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 GIF_EXTS = {".gif"}
@@ -149,24 +154,29 @@ def scan_items() -> None:
     )
 
 
-def _scan_folder_pages(folder: Path) -> list[str]:
-    """フォルダ直下の画像・GIF のファイル名を返す(順不同)。"""
+def _scan_folder_pages(folder: Path) -> dict[str, float]:
+    """フォルダ直下の画像・GIF の ファイル名 -> 更新日時 を返す(順不同)。"""
     try:
-        return [
-            q.name
-            for q in folder.iterdir()
-            if q.is_file()
-            and not q.name.startswith(".")
-            and q.suffix.lower() in PAGE_EXTS
-        ]
+        entries = list(folder.iterdir())
     except OSError:
-        return []
+        return {}
+    pages: dict[str, float] = {}
+    for q in entries:
+        if q.name.startswith(".") or q.suffix.lower() not in PAGE_EXTS:
+            continue
+        try:
+            if q.is_file():
+                pages[q.name] = q.stat().st_mtime
+        except OSError:
+            continue
+    return pages
 
 
 def load_folder_order() -> tuple[str, dict]:
     """order.json を読み、(全フォルダ共通の並び順, フォルダ名 -> 並び順の指定) を返す。
 
-    {"default": "desc", "folders": {"フォルダ名": "asc" | "desc" | ["ファイル名", ...]}}
+    {"default": "oldest", "folders": {"フォルダ名": "name_asc" | ["ファイル名", ...]}}
+    値は ORDER_NAMES のいずれか。フォルダごとの指定にはファイル名のリストも使える。
     ファイルが無い・壊れている場合は全フォルダ DEFAULT_FOLDER_ORDER にする。"""
     if not ORDER_FILE.exists():
         return DEFAULT_FOLDER_ORDER, {}
@@ -191,15 +201,19 @@ def load_folder_order() -> tuple[str, dict]:
     return default, folders
 
 
-def order_pages(folder: str, names: list[str], spec, default: str) -> list[str]:
-    """フォルダ内のファイル名を表示順に並べる。
+def order_pages(folder: str, pages: dict[str, float], spec, default: str) -> list[str]:
+    """フォルダ内のファイル(pages: ファイル名 -> 更新日時)を表示順に並べる。
 
-    spec が "asc" / "desc" ならファイル名の自然順で並べ、ファイル名のリストなら
+    spec が ORDER_NAMES のいずれかならその順で並べ、ファイル名のリストなら
     その順で先頭に置き、リストに無いファイルは default の順で後ろに続ける。"""
-    ascending = sorted(names, key=natural_key)
 
     def by(order: str) -> list[str]:
-        return ascending[::-1] if order == ORDER_DESC else ascending
+        if order in (ORDER_OLDEST, ORDER_NEWEST):
+            sign = 1 if order == ORDER_OLDEST else -1
+            # 更新日時が同じファイルはファイル名の自然順にする
+            return sorted(pages, key=lambda n: (sign * pages[n], natural_key(n)))
+        ascending = sorted(pages, key=natural_key)
+        return ascending[::-1] if order == ORDER_NAME_DESC else ascending
 
     if spec is None:
         return by(default)
@@ -211,10 +225,9 @@ def order_pages(folder: str, names: list[str], spec, default: str) -> list[str]:
             f"{' / '.join(ORDER_NAMES)} かファイル名のリストにしてください"
         )
         return by(default)
-    existing = set(names)
     head: list[str] = []
     for n in spec:
-        if not isinstance(n, str) or n not in existing:
+        if not isinstance(n, str) or n not in pages:
             print(f"[warn] {ORDER_FILE.name}: 「{folder}」に「{n}」がありません")
         elif n not in head:
             head.append(n)
