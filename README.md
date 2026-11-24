@@ -75,7 +75,8 @@ copy config.example.py config.py
   - GIF: `.gif`
   - 動画: `.mov .mp4 .m4v .webm`
   - 文書: `.pdf`
-- サブフォルダはトップレベルの1階層のみを対象とし、中の画像・GIF をファイル名の自然順(`1, 2, 10` の順)で並べる。画像が1枚も無いフォルダは一覧に出ない
+- サブフォルダはトップレベルの1階層のみを対象とし、中の画像・GIF を既定ではファイル名の自然順の降順(`10, 2, 1` の順)で並べる。並び順は `order.json` で変えられる(下記「フォルダ内の並び順」)。画像が1枚も無いフォルダは一覧に出ない
+- フォルダの一覧サムネイル(表紙)は、並べ替えた後の先頭ページ
 - サムネイルは `thumbnails/` に JPEG キャッシュ(元ファイルのパスと mtime をキーに自動更新)
   - PDF は1ページ目、動画は再生開始1秒地点のフレームをサムネイルにする
 - PDF は `cache/` にページ画像(JPEG・幅1400px目安)をキャッシュし、表示のたびに再描画しない
@@ -84,13 +85,40 @@ copy config.example.py config.py
 - 動画は Range リクエストに対応しているため、大きいファイルでもシークできる。`.mov` の再生可否は端末のコーデック対応次第(iPad / Mac の Safari は H.264・HEVC とも再生可)
 - フォルダに新規ファイルが追加された場合は、Python プロセスを再起動して再スキャンする
 - 認証なし(同一WiFi内利用を前提)
+- 画面のタイトルは `config.py` の `SITE_TITLE` で変えられる(省略時は「ギャラリー」)
+
+## フォルダ内の並び順
+
+`app.py` と同じ場所に `order.json` を置くと、フォルダ内の画像の並び順を変えられる。無ければ全フォルダがファイル名の自然順の降順になる。書式は `order.example.json` を参照。
+
+```json
+{
+  "default": "desc",
+  "folders": {
+    "昇順で読みたいフォルダ名": "asc",
+    "順番を細かく決めたいフォルダ名": ["表紙.jpg", "1.png", "2.png"]
+  }
+}
+```
+
+| キー | 値 | 意味 |
+| --- | --- | --- |
+| `default` | `"asc"` / `"desc"` | 全フォルダ共通の並び順。`asc` はファイル名の自然順の昇順(`1, 2, 10`)、`desc` は降順(`10, 2, 1`)。省略時は `desc` |
+| `folders` の各キー | フォルダ名(トップレベルのフォルダ名そのまま) | |
+| `folders` の各値 | `"asc"` / `"desc"` | そのフォルダだけ並び順を変える |
+| `folders` の各値 | ファイル名のリスト | 書いた順に並べる。リストに無いファイルは `default` の順で後ろに続く |
+
+- 反映には Python プロセスの再起動が必要(新規ファイルの検出と同じく、起動時にだけ読む)
+- 存在しないフォルダ名・ファイル名や書式の誤りは、起動時にコンソールへ `[warn]` を出して無視する
 
 ## ファイル構成
 
 ```
 app.py              # FastAPI 本体
-config.py           # SCREENSHOT_DIR を定義(gitignore)
+config.py           # SCREENSHOT_DIR / SITE_TITLE を定義(gitignore)
 config.example.py   # config.py のテンプレート
+order.json          # フォルダ内の並び順の設定(任意・gitignore)
+order.example.json  # order.json の書式例
 templates/          # HTML
 static/             # JS / CSS
 thumbnails/         # サムネイルの自動生成キャッシュ(gitignore)

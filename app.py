@@ -19,17 +19,30 @@ from fastapi.templating import Jinja2Templates
 from PIL import Image
 
 try:
+    import config
     from config import SCREENSHOT_DIR
 except ImportError as e:
     raise SystemExit(
         "config.py が見つかりません。config.example.py をコピーして作成してください。"
     ) from e
 
+# 画面のタイトル。SITE_TITLE を書いていない既存の config.py でも起動できるよう既定値を持つ
+DEFAULT_SITE_TITLE = "ギャラリー"
+SITE_TITLE = getattr(config, "SITE_TITLE", DEFAULT_SITE_TITLE)
+
 BASE_DIR = Path(__file__).resolve().parent
 THUMB_DIR = BASE_DIR / "thumbnails"
 CACHE_DIR = BASE_DIR / "cache"
 VIEWED_FILE = BASE_DIR / "viewed.json"
 SEEN_FILE = BASE_DIR / "seen.json"
+# フォルダ内の並び順の設定(任意。無ければ全フォルダ DEFAULT_FOLDER_ORDER)
+ORDER_FILE = BASE_DIR / "order.json"
+
+# フォルダ内の並び順: ファイル名の自然順の昇順(1, 2, 10)/ 降順(10, 2, 1)
+ORDER_ASC = "asc"
+ORDER_DESC = "desc"
+ORDER_NAMES = (ORDER_ASC, ORDER_DESC)
+DEFAULT_FOLDER_ORDER = ORDER_DESC
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 GIF_EXTS = {".gif"}
@@ -104,6 +117,7 @@ def scan_items() -> None:
         print(f"[warn] {SCREENSHOT_DIR} does not exist")
         IMAGES, FOLDERS = {}, {}
         return
+    default_order, folder_orders = load_folder_order()
     for p in SCREENSHOT_DIR.iterdir():
         if p.name.startswith("."):
             continue
@@ -115,6 +129,9 @@ def scan_items() -> None:
             pages = _scan_folder_pages(p)
             if not pages:
                 continue
+            pages = order_pages(
+                p.name, pages, folder_orders.get(p.name), default_order
+            )
             folders[p.name] = {"mtime": stat.st_mtime, "files": pages, "sizes": None}
         elif p.is_file() and p.suffix.lower() in ALLOWED_EXTS:
             files[p.name] = {
@@ -122,6 +139,8 @@ def scan_items() -> None:
                 "size": stat.st_size,
                 "type": file_type(p.name),
             }
+    for name in folder_orders.keys() - folders.keys():
+        print(f"[warn] {ORDER_FILE.name}: フォルダ「{name}」が見つかりません")
     IMAGES, FOLDERS = files, folders
     update_seen(set(files) | {folder_key(n) for n in folders})
     print(
@@ -131,8 +150,9 @@ def scan_items() -> None:
 
 
 def _scan_folder_pages(folder: Path) -> list[str]:
+    """フォルダ直下の画像・GIF のファイル名を返す(順不同)。"""
     try:
-        names = [
+        return [
             q.name
             for q in folder.iterdir()
             if q.is_file()
@@ -141,7 +161,65 @@ def _scan_folder_pages(folder: Path) -> list[str]:
         ]
     except OSError:
         return []
-    return sorted(names, key=natural_key)
+
+
+def load_folder_order() -> tuple[str, dict]:
+    """order.json を読み、(全フォルダ共通の並び順, フォルダ名 -> 並び順の指定) を返す。
+
+    {"default": "desc", "folders": {"フォルダ名": "asc" | "desc" | ["ファイル名", ...]}}
+    ファイルが無い・壊れている場合は全フォルダ DEFAULT_FOLDER_ORDER にする。"""
+    if not ORDER_FILE.exists():
+        return DEFAULT_FOLDER_ORDER, {}
+    try:
+        data = json.loads(ORDER_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[warn] {ORDER_FILE.name} を読み込めないため既定の並び順にします: {e}")
+        return DEFAULT_FOLDER_ORDER, {}
+    if not isinstance(data, dict):
+        print(f"[warn] {ORDER_FILE.name} はオブジェクト形式で書いてください")
+        return DEFAULT_FOLDER_ORDER, {}
+    default = data.get("default", DEFAULT_FOLDER_ORDER)
+    if default not in ORDER_NAMES:
+        print(
+            f"[warn] {ORDER_FILE.name}: default は {' / '.join(ORDER_NAMES)} のいずれかです"
+        )
+        default = DEFAULT_FOLDER_ORDER
+    folders = data.get("folders", {})
+    if not isinstance(folders, dict):
+        print(f"[warn] {ORDER_FILE.name}: folders はオブジェクト形式で書いてください")
+        folders = {}
+    return default, folders
+
+
+def order_pages(folder: str, names: list[str], spec, default: str) -> list[str]:
+    """フォルダ内のファイル名を表示順に並べる。
+
+    spec が "asc" / "desc" ならファイル名の自然順で並べ、ファイル名のリストなら
+    その順で先頭に置き、リストに無いファイルは default の順で後ろに続ける。"""
+    ascending = sorted(names, key=natural_key)
+
+    def by(order: str) -> list[str]:
+        return ascending[::-1] if order == ORDER_DESC else ascending
+
+    if spec is None:
+        return by(default)
+    if spec in ORDER_NAMES:
+        return by(spec)
+    if not isinstance(spec, list):
+        print(
+            f"[warn] {ORDER_FILE.name}: フォルダ「{folder}」の指定は "
+            f"{' / '.join(ORDER_NAMES)} かファイル名のリストにしてください"
+        )
+        return by(default)
+    existing = set(names)
+    head: list[str] = []
+    for n in spec:
+        if not isinstance(n, str) or n not in existing:
+            print(f"[warn] {ORDER_FILE.name}: 「{folder}」に「{n}」がありません")
+        elif n not in head:
+            head.append(n)
+    listed = set(head)
+    return head + [n for n in by(default) if n not in listed]
 
 
 def load_viewed() -> None:
@@ -436,7 +514,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(request, "index.html", {"title": SITE_TITLE})
 
 
 @app.get("/api/items")
@@ -462,6 +540,9 @@ def list_items():
     for name, meta in FOLDERS.items():
         enc = quote(name, safe="")
         key = folder_key(name)
+        # 表紙は並べ替え後の先頭ページなので、order.json で表紙が変わったときに
+        # ブラウザが古い表紙をキャッシュから出さないよう URL に表紙名を含める
+        cover = quote(meta["files"][0], safe="")
         items.append(
             {
                 "key": key,
@@ -470,7 +551,7 @@ def list_items():
                 "mtime": meta["mtime"],
                 "viewed_at": VIEWED.get(key),
                 "is_new": key in NEW_ITEMS,
-                "thumb": f"/folders/{enc}/thumb",
+                "thumb": f"/folders/{enc}/thumb?cover={cover}",
                 "src": None,
                 "info": f"/api/folders/{enc}",
                 "viewed_url": f"/api/folders/{enc}/viewed",
