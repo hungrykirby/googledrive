@@ -13,3 +13,6 @@ SCREENSHOT_DIR = Path.home() / "Documents" / "スクリーンショット"
 
 # Windows + OneDrive 同期が有効な場合
 # SCREENSHOT_DIR = Path.home() / "OneDrive" / "Pictures" / "Screenshots"
+
+# 画面のタイトル(省略時は「ギャラリー」)
+# SITE_TITLE = "ギャラリー"

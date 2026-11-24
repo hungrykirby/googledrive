@@ -192,9 +192,10 @@ header h1 {
   right: 16px;
   width: 44px;
   height: 44px;
-  border: 0;
+  /* 白い画像に重なっても見えるよう暗い半透明の円にし、黒い画像でも輪郭が分かるよう薄い白の縁を付ける */
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.45);
   color: #fff;
   font-size: 28px;
   line-height: 1;
@@ -203,5 +204,5 @@ header h1 {
 }
 
 #modal-close:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.65);
 }
